@@ -1,0 +1,86 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Update and upgrade system
+      apt:
+        update_cache: yes
+        upgrade: yes
+        autoremove: yes
+        autoclean: yes
+
+    - name: Add Node.js repository
+      apt_key:
+        url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+      apt_repository:
+        repo: "deb https://deb.nodesource.com/{{ ansible_distribution|lower }} {{ ansible_distribution_release }} main"
+
+    - name: Install Node.js and PM2
+      apt:
+        name:
+          - nodejs
+      become: yes
+      tags:
+        - node
+
+    - name: Install Nginx
+      apt:
+        name:
+          - nginx
+      become: yes
+      tags:
+        - nginx
+
+    - name: Install PM2
+      become_user: "{{ ansible_user }}"
+      become_method: sudo
+      npm:
+        name: pm2
+        global: yes
+
+    - name: Configure firewall
+      ufw:
+        rule: "{{ item }}"
+        state: present
+      with_items:
+        - "OpenSSH"
+        - "Nginx Full"
+      tags:
+        - firewall
+
+    - name: Set up Nginx reverse proxy
+      become: true
+      become_method: sudo
+      copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 80;
+              server_name your_domain.com;
+
+              location /api {
+                  proxy_pass http://localhost:8000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+
+              location / {
+                  proxy_pass http://localhost:3000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+          }
+      notify:
+        - reload nginx
+      tags:
+        - nginx
+
+  handlers:
+    - name: reload nginx
+      become: true
+      become_method: sudo
+      service:
+        name: nginx
+        state: reloaded

@@ -1,0 +1,57 @@
+---
+- hosts: your_remote_host
+  become: true
+  tasks:
+    - name: Update and upgrade the system
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install Node.js LTS
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
+      register: nodejs_install_result
+
+    - name: Add Node.js repository key
+      apt_key:
+        url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+        state: present
+
+    - name: Add Node.js repository
+      apt_repository:
+        repo: deb https://deb.nodesource.com/{{ ansible_distribution|lower }} {{ ansible_distribution_release }} main
+        state: present
+        filename: nodesource.list
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Configure Nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Install PM2
+      npm:
+        name: pm2
+        global: yes
+
+    - name: Configure firewall
+      ufw:
+        rule: "{{ item }}"
+        state: present
+      loop:
+        - allow ssh
+        - allow http
+        - allow https
+        - allow 'Nginx Full'
+
+    - name: Reload firewall
+      ufw:
+        state: reloaded
