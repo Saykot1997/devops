@@ -1,0 +1,58 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible
+
+      - name: Copy Ansible inventory file
+        run: |
+          cp host.ini ansible/hosts/host.ini
+
+      - name: Deploy using Ansible
+        run: |
+          ansible-playbook -i ansible/hosts/host.ini ansible.yaml
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: false
+
+      - name: Send email notification on failure
+        if: ${{ failure() }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.example.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Deployment Failure"
+          body: "Deployment failed. Please check the build log for more details."
+          from: your-email@example.com
+          to: recipient-email@example.com
+# This code includes the following steps:
+
+# Checking out the code from the repository.
+# Setting up Node.js.
+# Installing Ansible.
+# Copying the Ansible inventory file.
+# Deploying using Ansible playbook.
+# Sending an email notification if the deployment fails.
+# Please make sure to replace smtp.example.com with the address of your email notification service or SMTP server, and your-email@example.com and recipient-email@example.com with the appropriate email addresses for the sender and recipient.
+
+# Remember to also set up the necessary secrets (EMAIL_USERNAME and EMAIL_PASSWORD) in your GitHub repository settings to securely store the email credentials.

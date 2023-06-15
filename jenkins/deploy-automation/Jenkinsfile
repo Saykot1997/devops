@@ -1,0 +1,51 @@
+// To send email notifications in case of a deployment failure, you can use the Email extension in your Jenkins pipeline. Here's an example of how you can include email notifications in jenkins:
+
+// Make sure you have the Email Extension Plugin installed in your Jenkins instance.
+
+
+pipeline {
+    agent any
+
+    stages {
+        stage('git clone') {
+            steps {
+               git branch: 'main', credentialsId: 'saykot_github_credential', url: 'https://github.com/Saykot1997/TFWP.git'
+            }
+        }
+          stage('check all files') {
+            steps {
+               sh 'ls -la'
+            }
+        }
+        stage('copying all files to remote server') {
+            steps {
+               sh 'scp -r -i ~/.ssh/id_rsa . root@206.189.129.107:temp'
+            }
+        }
+        stage('deploying app') {
+            steps {
+              sh 'ansible-playbook -i ~/ansible/hosts/host.ini ansible.yaml'
+            }
+        }
+        post {
+            failure {
+                emailext body: "Deployment failed. Please check the build log for more details.",
+                    recipientProviders: [[$class: 'CulpritsRecipientProvider']],
+                    subject: "Deployment Failure",
+                    to: "your-email@example.com"
+            }
+        }
+    }
+}
+
+// In this Jenkins pipeline code:
+
+// The post section is added after the deployment stage. This section defines what actions to take after the pipeline finishes.
+
+// The failure block is used to specify that the email should be sent only if the deployment stage fails.
+
+// The emailext step is used to send the email notification. You can customize the email's subject, body, and recipient address according to your requirements.
+
+// Make sure to replace "your-email@example.com" with the actual recipient email address where you want to receive the deployment failure notifications.
+
+// With these modifications, if the deployment step fails, an email notification will be sent to the specified recipient address.
