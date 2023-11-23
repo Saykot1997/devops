@@ -7,13 +7,6 @@
         update_cache: yes
         upgrade: dist
 
-    - name: Install Node.js LTS
-      apt:
-        name: nodejs
-        state: present
-        update_cache: yes
-      register: nodejs_install_result
-
     - name: Add Node.js repository key
       apt_key:
         url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
@@ -21,9 +14,15 @@
 
     - name: Add Node.js repository
       apt_repository:
-        repo: deb https://deb.nodesource.com/{{ ansible_distribution|lower }} {{ ansible_distribution_release }} main
+        repo: deb https://deb.nodesource.com/{{ ansible_distribution|lower }}_{{ ansible_distribution_release }} main
         state: present
         filename: nodesource.list
+
+    - name: Install Node.js LTS
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
 
     - name: Install Nginx
       apt:
@@ -32,26 +31,31 @@
         update_cache: yes
 
     - name: Configure Nginx
-      systemd:
-        name: nginx
-        state: started
-        enabled: yes
+      lineinfile:
+        path: /etc/nginx/sites-available/default
+        line: |
+          server {
+              listen 80 default_server;
+              server_name _;
 
-    - name: Install PM2
-      npm:
-        name: pm2
-        global: yes
+              location / {
+                  proxy_pass http://localhost:3000;
+              }
 
-    - name: Configure firewall
-      ufw:
-        rule: "{{ item }}"
-        state: present
-      loop:
-        - allow ssh
-        - allow http
-        - allow https
-        - allow 'Nginx Full'
+              location /api {
+                  proxy_pass http://localhost:8000;
+              }
+          }
+      notify:
+        - Restart Nginx
 
     - name: Reload firewall
       ufw:
         state: reloaded
+
+  handlers:
+    - name: Restart Nginx
+      systemd:
+        name: nginx
+        state: restarted
+
