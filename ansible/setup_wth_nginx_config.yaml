@@ -1,86 +1,60 @@
 ---
-- hosts: all
+- hosts: your_remote_host
   become: true
   tasks:
-    - name: Update and upgrade system
+    - name: Update and upgrade the system
       apt:
         update_cache: yes
-        upgrade: yes
-        autoremove: yes
-        autoclean: yes
+        upgrade: dist
 
-    - name: Add Node.js repository
+    - name: Add Node.js repository key
       apt_key:
         url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
-      apt_repository:
-        repo: "deb https://deb.nodesource.com/{{ ansible_distribution|lower }} {{ ansible_distribution_release }} main"
+        state: present
 
-    - name: Install Node.js and PM2
+    - name: Add Node.js repository
+      apt_repository:
+        repo: deb https://deb.nodesource.com/{{ ansible_distribution|lower }}_{{ ansible_distribution_release }} main
+        state: present
+        filename: nodesource.list
+
+    - name: Install Node.js LTS
       apt:
-        name:
-          - nodejs
-      become: yes
-      tags:
-        - node
+        name: nodejs
+        state: present
+        update_cache: yes
 
     - name: Install Nginx
       apt:
-        name:
-          - nginx
-      become: yes
-      tags:
-        - nginx
-
-    - name: Install PM2
-      become_user: "{{ ansible_user }}"
-      become_method: sudo
-      npm:
-        name: pm2
-        global: yes
-
-    - name: Configure firewall
-      ufw:
-        rule: "{{ item }}"
+        name: nginx
         state: present
-      with_items:
-        - "OpenSSH"
-        - "Nginx Full"
-      tags:
-        - firewall
+        update_cache: yes
 
-    - name: Set up Nginx reverse proxy
-      become: true
-      become_method: sudo
-      copy:
-        dest: /etc/nginx/sites-available/default
-        content: |
+    - name: Configure Nginx
+      lineinfile:
+        path: /etc/nginx/sites-available/default
+        line: |
           server {
-              listen 80;
-              server_name your_domain.com;
-
-              location /api {
-                  proxy_pass http://localhost:8000;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              }
+              listen 80 default_server;
+              server_name _;
 
               location / {
                   proxy_pass http://localhost:3000;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+
+              location /api {
+                  proxy_pass http://localhost:8000;
               }
           }
       notify:
-        - reload nginx
-      tags:
-        - nginx
+        - Restart Nginx
+
+    - name: Reload firewall
+      ufw:
+        state: reloaded
 
   handlers:
-    - name: reload nginx
-      become: true
-      become_method: sudo
-      service:
+    - name: Restart Nginx
+      systemd:
         name: nginx
-        state: reloaded
+        state: restarted
