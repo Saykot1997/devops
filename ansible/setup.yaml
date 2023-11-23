@@ -31,31 +31,34 @@
         update_cache: yes
 
     - name: Configure Nginx
-      lineinfile:
-        path: /etc/nginx/sites-available/default
-        line: |
-          server {
-              listen 80 default_server;
-              server_name _;
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
 
-              location / {
-                  proxy_pass http://localhost:3000;
-              }
+    - name: Install PM2
+      npm:
+        name: pm2
+        global: yes
 
-              location /api {
-                  proxy_pass http://localhost:8000;
-              }
-          }
-      notify:
-        - Restart Nginx
+    - name: Configure firewall
+      ufw:
+        rule: "{{ item }}"
+        state: present
+      loop:
+        - name: allow SSH
+          rule: allow
+          port: 22
+        - name: allow HTTP
+          rule: allow
+          port: 80
+        - name: allow HTTPS
+          rule: allow
+          port: 443
+        - name: allow Nginx Full
+          rule: allow
+          port: 80,443
 
     - name: Reload firewall
       ufw:
         state: reloaded
-
-  handlers:
-    - name: Restart Nginx
-      systemd:
-        name: nginx
-        state: restarted
-
